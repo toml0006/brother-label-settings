@@ -1,0 +1,785 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Label Printer</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --surface2: #22263a;
+    --border: rgba(255,255,255,0.07);
+    --text: #e2e8f7;
+    --muted: #6b7394;
+    --accent: #4f7cff;
+    --accent-dim: rgba(79,124,255,0.12);
+    --green: #22d98f;
+    --green-dim: rgba(34,217,143,0.1);
+    --amber: #f5a623;
+    --amber-dim: rgba(245,166,35,0.1);
+    --red: #ff5060;
+    --red-dim: rgba(255,80,96,0.1);
+    --radius: 10px;
+    --font: 'Courier New', 'SF Mono', monospace;
+    --sans: system-ui, -apple-system, sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    min-height: 100vh;
+    padding: 0;
+  }
+
+  /* ── Header ─────────────────────────────────── */
+  header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 18px 32px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+  .logo {
+    width: 36px; height: 36px;
+    background: var(--accent);
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .logo svg { width: 20px; height: 20px; }
+  .header-text h1 {
+    font-family: var(--font);
+    font-size: 15px;
+    font-weight: normal;
+    letter-spacing: 0.04em;
+    color: var(--text);
+  }
+  .header-text p {
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 1px;
+    font-family: var(--font);
+  }
+  .status-badge {
+    margin-left: auto;
+    display: flex; align-items: center; gap: 7px;
+    font-size: 12px;
+    font-family: var(--font);
+    color: var(--muted);
+  }
+  .dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--muted);
+    transition: background 0.4s;
+  }
+  .dot.online { background: var(--green); box-shadow: 0 0 6px var(--green); }
+  .dot.offline { background: var(--red); }
+  .dot.busy { background: var(--amber); box-shadow: 0 0 6px var(--amber); }
+
+  /* ── Main layout ─────────────────────────────── */
+  main {
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 32px 24px 60px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+
+  /* ── Cards ───────────────────────────────────── */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 22px 24px;
+  }
+  .card.wide { grid-column: 1 / -1; }
+  .card h2 {
+    font-family: var(--font);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--muted);
+    margin-bottom: 18px;
+  }
+
+  /* ── Stat grid ───────────────────────────────── */
+  .stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+  .stat {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 16px;
+  }
+  .stat .label { font-size: 11px; color: var(--muted); margin-bottom: 6px; font-family: var(--font); }
+  .stat .value { font-size: 22px; font-family: var(--font); color: var(--text); font-weight: normal; }
+  .stat .value.green { color: var(--green); }
+  .stat .value.amber { color: var(--amber); }
+  .stat .value.red { color: var(--red); }
+  .stat .unit { font-size: 12px; color: var(--muted); }
+
+  /* ── Printer status visual ───────────────────── */
+  .printer-visual {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    padding: 4px 0 8px;
+  }
+  .printer-icon {
+    width: 80px; height: 56px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+    position: relative;
+    overflow: hidden;
+  }
+  .printer-icon svg { width: 42px; height: 42px; opacity: 0.7; }
+  .label-strip {
+    position: absolute;
+    bottom: 8px; left: 50%;
+    transform: translateX(-50%);
+    height: 4px;
+    width: 0;
+    background: var(--green);
+    border-radius: 2px;
+    transition: width 1s ease-out;
+  }
+  .label-strip.printing { width: 60px; animation: print-strip 1.8s ease-in-out infinite; }
+  @keyframes print-strip {
+    0% { width: 0; opacity: 1; }
+    60% { width: 60px; opacity: 1; }
+    100% { width: 60px; opacity: 0; }
+  }
+  .printer-details { flex: 1; }
+  .printer-details .pname {
+    font-family: var(--font);
+    font-size: 14px;
+    color: var(--text);
+    margin-bottom: 5px;
+  }
+  .printer-details .pstate {
+    font-size: 13px;
+    color: var(--muted);
+    display: flex; align-items: center; gap: 6px;
+  }
+
+  /* ── Buttons ─────────────────────────────────── */
+  .actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 18px; }
+  .btn {
+    font-family: var(--font);
+    font-size: 12px;
+    padding: 8px 16px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    cursor: pointer;
+    background: var(--surface2);
+    color: var(--text);
+    transition: all 0.15s;
+    letter-spacing: 0.03em;
+  }
+  .btn:hover { background: var(--accent-dim); border-color: var(--accent); color: var(--accent); }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .btn.primary:hover { background: #6b92ff; }
+  .btn.danger:hover { background: var(--red-dim); border-color: var(--red); color: var(--red); }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  /* ── Job queue ───────────────────────────────── */
+  .job-list { display: flex; flex-direction: column; gap: 8px; min-height: 60px; }
+  .job-item {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    padding: 10px 14px;
+    display: flex; align-items: center; gap: 12px;
+    font-family: var(--font);
+    font-size: 12px;
+  }
+  .job-item .job-name { flex: 1; color: var(--text); }
+  .job-item .job-status { color: var(--muted); font-size: 11px; }
+  .empty-queue {
+    color: var(--muted);
+    font-size: 12px;
+    font-family: var(--font);
+    text-align: center;
+    padding: 20px 0;
+  }
+
+  /* ── Connection info ─────────────────────────── */
+  .info-table { width: 100%; border-collapse: collapse; }
+  .info-table tr { border-bottom: 1px solid var(--border); }
+  .info-table tr:last-child { border-bottom: none; }
+  .info-table td {
+    padding: 10px 0;
+    font-size: 13px;
+    font-family: var(--font);
+  }
+  .info-table td:first-child { color: var(--muted); width: 44%; font-size: 11px; letter-spacing: 0.06em; }
+  .info-table td:last-child { color: var(--text); }
+  .info-table select {
+    font-family: var(--font);
+    font-size: 12px;
+    padding: 6px 8px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--surface2);
+    color: var(--text);
+  }
+  .info-table select.changed { border-color: var(--accent); }
+  .info-table .note { display: block; margin-top: 3px; font-size: 10px; letter-spacing: 0; }
+  .info-table .copyable {
+    cursor: pointer;
+    color: var(--accent);
+    display: inline-flex; align-items: center; gap: 5px;
+  }
+  .info-table .copyable:hover { text-decoration: underline; }
+
+  /* ── Toast ───────────────────────────────────── */
+  #toast {
+    position: fixed; bottom: 24px; right: 24px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 18px;
+    font-family: var(--font);
+    font-size: 13px;
+    color: var(--text);
+    transform: translateY(80px);
+    opacity: 0;
+    transition: all 0.25s ease;
+    z-index: 999;
+  }
+  #toast.show { transform: translateY(0); opacity: 1; }
+
+  /* ── Responsive ──────────────────────────────── */
+  @media (max-width: 600px) {
+    main { grid-template-columns: 1fr; padding: 16px 12px 40px; }
+    .card.wide { grid-column: 1; }
+    header { padding: 14px 16px; }
+  }
+
+  /* ── Print controls ──────────────────────────── */
+  .print-controls {
+    display: flex;
+    gap: 24px;
+    align-items: center;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+  }
+  .mode-toggle { display: flex; align-items: center; gap: 8px; }
+  .mode-label {
+    font-family: var(--font);
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 0.06em;
+    margin-right: 4px;
+  }
+  .mode-btn { padding: 6px 12px; font-size: 11px; }
+  .mode-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .label-detect { display: flex; align-items: center; gap: 8px; }
+  .detected-value {
+    font-family: var(--font);
+    font-size: 13px;
+    color: var(--green);
+  }
+  .drop-zone {
+    border: 2px dashed var(--border);
+    border-radius: 8px;
+    padding: 28px 20px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    margin-bottom: 16px;
+  }
+  .drop-zone:hover, .drop-zone.dragover {
+    border-color: var(--accent);
+    background: var(--accent-dim);
+  }
+  .drop-zone.has-file {
+    border-color: var(--green);
+    border-style: solid;
+    background: var(--green-dim);
+  }
+  .drop-icon { margin-bottom: 8px; }
+  .drop-text {
+    font-family: var(--font);
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .drop-zone.has-file .drop-text { color: var(--green); }
+
+  /* ── Scanlines texture ───────────────────────── */
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(255,255,255,0.013) 2px,
+      rgba(255,255,255,0.013) 4px
+    );
+    pointer-events: none;
+    z-index: 1000;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round">
+      <rect x="2" y="7" width="20" height="10" rx="2"/>
+      <path d="M7 7V4h10v3"/>
+      <path d="M7 17v3h10v-3"/>
+      <circle cx="18" cy="12" r="1" fill="white" stroke="none"/>
+    </svg>
+  </div>
+  <div class="header-text">
+    <h1>LABEL PRINTER // PRINT SERVER</h1>
+    <p id="hostname-display">loading...</p>
+  </div>
+  <div class="status-badge">
+    <div class="dot" id="header-dot"></div>
+    <span id="header-status">connecting</span>
+  </div>
+</header>
+
+<main>
+
+  <!-- Printer status card -->
+  <div class="card wide">
+    <h2>Printer Status</h2>
+    <div class="printer-visual">
+      <div class="printer-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.5" stroke-linecap="round">
+          <rect x="2" y="7" width="20" height="10" rx="2"/>
+          <path d="M7 7V4h10v3"/>
+          <path d="M7 17v3h10v-3"/>
+          <circle cx="18" cy="12" r="1" fill="var(--accent)" stroke="none"/>
+        </svg>
+        <div class="label-strip" id="label-strip"></div>
+      </div>
+      <div class="printer-details">
+        <div class="pname">Label Printer</div>
+        <div class="pstate" style="margin-top:2px">
+          <span id="model-text" style="color:var(--muted);font-size:11px;letter-spacing:0.04em">—</span>
+        </div>
+        <div class="pstate" style="margin-top:6px">
+          <div class="dot" id="state-dot"></div>
+          <span id="state-text">Checking...</span>
+        </div>
+        <div class="pstate" style="margin-top:4px">
+          <span id="media-text" style="color:var(--muted);font-size:12px">Media: —</span>
+        </div>
+      </div>
+    </div>
+    <div class="actions">
+      <button class="btn primary" onclick="doAction('test_print')">Test Print</button>
+      <button class="btn" id="btn-toggle" onclick="togglePrinter()">Enable</button>
+      <button class="btn danger" onclick="doAction('cancel_all')">Cancel All Jobs</button>
+      <button class="btn" onclick="refresh()" style="margin-left:auto">↻ Refresh</button>
+    </div>
+  </div>
+
+  <!-- Stats -->
+  <div class="card">
+    <h2>System Stats</h2>
+    <div class="stats">
+      <div class="stat">
+        <div class="label">JOBS IN QUEUE</div>
+        <div class="value" id="stat-jobs">—</div>
+      </div>
+      <div class="stat">
+        <div class="label">CPU TEMP</div>
+        <div class="value" id="stat-temp">—</div>
+        <span class="unit">°C</span>
+      </div>
+      <div class="stat" style="grid-column:1/-1">
+        <div class="label">UPTIME</div>
+        <div class="value" id="stat-uptime" style="font-size:14px">—</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Connection info -->
+  <div class="card">
+    <h2>Connection</h2>
+    <table class="info-table">
+      <tr>
+        <td>AIRPRINT</td>
+        <td>Auto-discovered</td>
+      </tr>
+      <tr>
+        <td>CUPS INTERFACE</td>
+        <td>
+          <span class="copyable" onclick="copyText('http://' + location.hostname + ':631')">
+            <span id="cups-link">...</span>
+            <svg width="11" height="11" viewBox="0 0 16 16" fill="currentColor"><path d="M3 2h7v2H5v9H3V2zm4 3h7v9H7V5z"/></svg>
+          </span>
+        </td>
+      </tr>
+      <tr>
+        <td>IPP URI</td>
+        <td>
+          <span class="copyable" onclick="copyText('ipp://' + location.hostname + '/printers/Label_Printer')">
+            <span id="ipp-link">...</span>
+          </span>
+        </td>
+      </tr>
+      <tr>
+        <td>HOSTNAME</td>
+        <td id="mdns-hostname">label-printer.local</td>
+      </tr>
+    </table>
+  </div>
+
+  <!-- Printer settings (stored in the printer; read on load, not on every refresh) -->
+  <div class="card wide">
+    <h2>Printer Settings</h2>
+    <table class="info-table" id="settings-table">
+      <tr><td>Loading…</td><td></td></tr>
+    </table>
+    <div class="actions">
+      <button class="btn primary" id="btn-save-settings" onclick="saveSettings()" disabled>Save</button>
+      <button class="btn" onclick="loadSettings()">Reload</button>
+      <button class="btn" onclick="doAction('print_settings_report')">Print Settings Report</button>
+    </div>
+  </div>
+
+  <!-- Print label -->
+  <div class="card wide">
+    <h2>Print Label</h2>
+    <div class="print-controls">
+      <div class="label-detect">
+        <span class="mode-label">LOADED MEDIA</span>
+        <span id="detected-label" class="detected-value">—</span>
+      </div>
+      <div class="label-detect">
+        <span class="mode-label">PHASE</span>
+        <span id="detected-phase" class="detected-value" style="color:var(--muted)">—</span>
+      </div>
+    </div>
+    <div class="drop-zone" id="drop-zone" onclick="document.getElementById('file-input').click()">
+      <input type="file" id="file-input" accept="application/pdf" style="display:none" onchange="handleFile(this.files[0])">
+      <div class="drop-icon">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="1.5" stroke-linecap="round">
+          <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+          <polyline points="17 8 12 3 7 8"/>
+          <line x1="12" y1="3" x2="12" y2="15"/>
+        </svg>
+      </div>
+      <div class="drop-text" id="drop-text">Drop PDF here or click to browse</div>
+    </div>
+    <div class="actions">
+      <button class="btn primary" id="btn-print" onclick="printLabel()" disabled>Print</button>
+      <span id="print-status" style="font-family:var(--font);font-size:12px;color:var(--muted);display:flex;align-items:center"></span>
+    </div>
+  </div>
+
+  <!-- Job queue -->
+  <div class="card wide">
+    <h2>Job Queue</h2>
+    <div class="job-list" id="job-list">
+      <div class="empty-queue">No jobs in queue</div>
+    </div>
+  </div>
+
+</main>
+
+<div id="toast"></div>
+
+<script>
+const API = '';
+let printerEnabled = true;
+
+function toast(msg, dur = 2500) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), dur);
+}
+
+function copyText(text) {
+  navigator.clipboard.writeText(text).then(() => toast('Copied to clipboard'));
+}
+
+async function refresh() {
+  try {
+    const res = await fetch(API + '/api/status');
+    const d = await res.json();
+    
+    // Header
+    document.getElementById('header-dot').className = 'dot ' + (d.enabled ? (d.idle ? 'online' : 'busy') : 'offline');
+    document.getElementById('header-status').textContent = d.enabled ? (d.idle ? 'idle' : 'printing') : 'disabled';
+    document.getElementById('hostname-display').textContent = location.hostname + ':' + location.port;
+
+    // Printer state
+    const stateDot = document.getElementById('state-dot');
+    const stateText = document.getElementById('state-text');
+    const strip = document.getElementById('label-strip');
+
+    if (!d.enabled) {
+      stateDot.className = 'dot offline';
+      stateText.textContent = 'Disabled';
+      strip.classList.remove('printing');
+    } else if (!d.idle) {
+      stateDot.className = 'dot busy';
+      stateText.textContent = 'Printing…';
+      strip.classList.add('printing');
+    } else {
+      stateDot.className = 'dot online';
+      stateText.textContent = 'Ready';
+      strip.classList.remove('printing');
+    }
+
+    printerEnabled = d.enabled;
+    const btn = document.getElementById('btn-toggle');
+    btn.textContent = d.enabled ? 'Disable' : 'Enable';
+
+    // Model line (configured model) + live status line come from different sources
+    const modelText = document.getElementById('model-text');
+
+    // Media info from printer status query
+    const ps = d.printer_status || {};
+    const liveModel = ps.model || '';
+    const configuredModel = d.printer_model || '';
+    if (liveModel && configuredModel && liveModel !== configuredModel) {
+      modelText.textContent = configuredModel + ' · reporting ' + liveModel;
+    } else {
+      modelText.textContent = configuredModel || liveModel || '—';
+    }
+    const mediaText = document.getElementById('media-text');
+    const detectedLabel = document.getElementById('detected-label');
+    const detectedPhase = document.getElementById('detected-phase');
+    if (ps.connected) {
+      const size = ps.media_size || 'unknown';
+      const type = ps.media_type || '';
+      mediaText.textContent = 'Media: ' + size + (type ? ' · ' + type : '');
+      mediaText.style.color = 'var(--muted)';
+      detectedLabel.textContent = size;
+      detectedLabel.style.color = 'var(--green)';
+      detectedPhase.textContent = ps.phase || '—';
+      detectedPhase.style.color = (ps.phase && ps.phase.toLowerCase().includes('waiting')) ? 'var(--green)' : 'var(--amber)';
+    } else {
+      mediaText.textContent = 'Media: ' + (ps.reason || 'printer not reachable');
+      mediaText.style.color = 'var(--red)';
+      detectedLabel.textContent = '—';
+      detectedLabel.style.color = 'var(--red)';
+      detectedPhase.textContent = '—';
+      detectedPhase.style.color = 'var(--muted)';
+    }
+
+    // Stats
+    const jobs = document.getElementById('stat-jobs');
+    jobs.textContent = d.job_count;
+    jobs.className = 'value' + (d.job_count > 0 ? ' amber' : ' green');
+
+    const temp = document.getElementById('stat-temp');
+    if (d.cpu_temp !== null) {
+      temp.textContent = d.cpu_temp;
+      temp.className = 'value' + (d.cpu_temp > 70 ? ' red' : d.cpu_temp > 55 ? ' amber' : ' green');
+    }
+
+    document.getElementById('stat-uptime').textContent = d.uptime || '—';
+
+    // Links
+    const h = location.hostname;
+    document.getElementById('cups-link').textContent = h + ':631';
+    document.getElementById('ipp-link').textContent = 'ipp://' + h + '/printers/Label_Printer';
+    document.getElementById('mdns-hostname').textContent = h;
+
+    // Jobs
+    await refreshJobs();
+  } catch(e) {
+    document.getElementById('header-dot').className = 'dot offline';
+    document.getElementById('header-status').textContent = 'unreachable';
+  }
+}
+
+async function refreshJobs() {
+  try {
+    const res = await fetch(API + '/api/jobs');
+    const jobs = await res.json();
+    const list = document.getElementById('job-list');
+    if (!jobs.length) {
+      list.innerHTML = '<div class="empty-queue">Queue is empty</div>';
+      return;
+    }
+    list.innerHTML = jobs.map(j => `
+      <div class="job-item">
+        <div class="job-name">${j.name}</div>
+        <div class="job-status">${Object.values(j.details || {})[0] || ''}</div>
+      </div>
+    `).join('');
+  } catch(e) {}
+}
+
+async function doAction(action) {
+  try {
+    const res = await fetch(API + '/api/action', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ action })
+    });
+    const d = await res.json();
+    toast(d.message || (d.ok ? 'Done' : 'Error'));
+    setTimeout(refresh, 600);
+  } catch(e) {
+    toast('Request failed');
+  }
+}
+
+function togglePrinter() {
+  doAction(printerEnabled ? 'disable' : 'enable');
+}
+
+// ── Printer settings ────────────────────────────
+function renderSettings(d) {
+  const table = document.getElementById('settings-table');
+  table.textContent = '';
+  if (!d.ok) {
+    table.insertRow().insertCell().textContent = d.message || 'Could not read settings';
+    return;
+  }
+  for (const s of d.settings) {
+    const row = table.insertRow();
+    const name = row.insertCell();
+    name.textContent = s.label.toUpperCase();
+    if (s.note) {
+      const note = document.createElement('span');
+      note.className = 'note';
+      note.textContent = s.note;
+      name.appendChild(note);
+    }
+    const sel = document.createElement('select');
+    sel.dataset.key = s.key;
+    sel.dataset.current = s.value;
+    const known = s.choices.some(c => c.value === s.value);
+    if (!known) {
+      const label = s.value === null ? 'No reply' : 'Unknown (' + s.value + ')';
+      sel.add(new Option(label, s.value));
+    }
+    for (const c of s.choices) sel.add(new Option(c.label, c.value));
+    sel.value = s.value;
+    sel.onchange = markChanged;
+    row.insertCell().appendChild(sel);
+  }
+  markChanged();
+}
+
+function changedSettings() {
+  const changes = {};
+  document.querySelectorAll('#settings-table select').forEach(sel => {
+    const dirty = sel.value !== sel.dataset.current;
+    sel.classList.toggle('changed', dirty);
+    if (dirty) changes[sel.dataset.key] = Number(sel.value);
+  });
+  return changes;
+}
+
+function markChanged() {
+  document.getElementById('btn-save-settings').disabled = !Object.keys(changedSettings()).length;
+}
+
+async function loadSettings() {
+  try {
+    renderSettings(await (await fetch(API + '/api/settings')).json());
+  } catch(e) {
+    renderSettings({ ok: false, message: 'Request failed' });
+  }
+}
+
+async function saveSettings() {
+  try {
+    const res = await fetch(API + '/api/settings', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(changedSettings())
+    });
+    const d = await res.json();
+    toast(d.ok ? 'Settings saved' : (d.message || 'Error'), d.ok ? 2500 : 4000);
+    if (d.ok) renderSettings(d);
+  } catch(e) {
+    toast('Request failed');
+  }
+}
+
+// ── Print label ─────────────────────────────────
+let selectedFile = null;
+
+function handleFile(file) {
+  if (!file || file.type !== 'application/pdf') {
+    toast('Please select a PDF file');
+    return;
+  }
+  selectedFile = file;
+  const zone = document.getElementById('drop-zone');
+  zone.classList.add('has-file');
+  document.getElementById('drop-text').textContent = file.name;
+  document.getElementById('btn-print').disabled = false;
+}
+
+// Drag and drop
+const dropZone = document.getElementById('drop-zone');
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropZone.classList.remove('dragover');
+  const file = e.dataTransfer.files[0];
+  if (file) handleFile(file);
+});
+
+async function printLabel() {
+  if (!selectedFile) return;
+  const btn = document.getElementById('btn-print');
+  const status = document.getElementById('print-status');
+  btn.disabled = true;
+  status.textContent = 'Uploading & printing...';
+  status.style.color = 'var(--amber)';
+
+  try {
+    const res = await fetch(API + '/api/print', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/pdf'},
+      body: selectedFile
+    });
+    const d = await res.json();
+    if (d.ok) {
+      status.textContent = d.message || 'Sent to CUPS';
+      status.style.color = 'var(--green)';
+      toast(d.message || 'Print job sent');
+    } else {
+      status.textContent = d.message || 'Print failed';
+      status.style.color = 'var(--red)';
+      toast(d.message || 'Error', 4000);
+    }
+    setTimeout(refresh, 1000);
+  } catch(e) {
+    status.textContent = 'Request failed';
+    status.style.color = 'var(--red)';
+    toast('Request failed');
+  }
+  btn.disabled = false;
+}
+
+// Boot
+refresh();
+loadSettings();
+setInterval(refresh, 6000);
+</script>
+</body>
+</html>

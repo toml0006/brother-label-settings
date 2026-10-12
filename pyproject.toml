@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "brother-label-settings"
+version = "0.1.0"
+description = "Read and change the stored settings (auto power off, cutter, ...) of Brother QL and PT label printers from Linux"
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.9"
+classifiers = [
+    "Operating System :: POSIX :: Linux",
+    "Topic :: Printing",
+]
+
+[project.scripts]
+brother-label-settings = "brother_label_settings.cli:main"
+
+[tool.setuptools]
+packages = ["brother_label_settings"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

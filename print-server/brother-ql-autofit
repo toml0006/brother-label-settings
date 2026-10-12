@@ -1,0 +1,172 @@
+#!/bin/bash
+# CUPS filter for Brother QL auto-fit printing (written for and tested on the QL-1100).
+# Converts PDF/image input to a label-sized PNG and prints via brother_ql.
+#
+# Called by CUPS as: filter job-id user title copies options [file]
+# Input: PDF, JPEG, or PNG on stdin or $6
+# Output: nothing (we print directly via brother_ql pyusb)
+
+BROTHER_QL="/opt/brother-ql-venv/bin/brother_ql"
+BROTHER_MODEL="${BROTHER_MODEL:-QL-1100}"
+# where the brother_label_settings package is installed
+SETTINGS_PATH="${SETTINGS_PATH:-/opt/label-printer-web}"
+LOG="/tmp/brother-ql-autofit.log"
+
+log() { echo "$(date '+%H:%M:%S') $*" >> "$LOG"; }
+
+# Label width in pixels at 300dpi (endless tape widths)
+declare -A LABEL_WIDTH_PX=(
+    [12]=106 [29]=306 [38]=413 [50]=554 [54]=590 [62]=696 [102]=1164
+)
+# Die-cut label dimensions: width_px x height_px at 300dpi
+declare -A DIECUT_SIZE=(
+    [17x54]="165x566"
+    [17x87]="165x956"
+    [23x23]="202x202"
+    [29x42]="306x425"
+    [29x90]="306x991"
+    [39x90]="413x991"
+    [39x48]="425x495"
+    [52x29]="578x271"
+    [54x29]="598x271"
+    [60x86]="672x954"
+    [62x29]="696x271"
+    [62x100]="696x1109"
+    [102x51]="1164x526"
+    [102x152]="1164x1660"
+    [103x164]="1200x1822"
+)
+
+# Default label (override by setting LABEL env var in CUPS or passing via options)
+DEFAULT_LABEL="${DEFAULT_LABEL:-102x152}"
+
+JOB_ID="$1"
+USER="$2"
+TITLE="$3"
+COPIES="$4"
+OPTIONS="$5"
+FILE="$6"
+
+log "Job $JOB_ID: user=$USER title='$TITLE' copies=$COPIES options='$OPTIONS' file='$FILE'"
+
+TMPDIR=$(mktemp -d /tmp/label-printer-job-XXXXXX)
+trap "rm -rf '$TMPDIR'" EXIT
+
+# Read input
+INPUT="$TMPDIR/input"
+if [ -n "$FILE" ]; then
+    cp "$FILE" "$INPUT"
+else
+    cat > "$INPUT"
+fi
+
+INPUT_SIZE=$(stat -c%s "$INPUT" 2>/dev/null || stat -f%z "$INPUT" 2>/dev/null)
+log "Input size: $INPUT_SIZE bytes"
+
+if [ "$INPUT_SIZE" -eq 0 ] 2>/dev/null; then
+    log "Empty input, skipping"
+    exit 0
+fi
+
+# Pick label from CUPS options if present, else fall back to default
+# Accepts forms like: PageSize=102x152, media=62, label=29x90
+LABEL="$DEFAULT_LABEL"
+if [[ "$OPTIONS" =~ (PageSize|media|label)=([0-9]+x?[0-9]*) ]]; then
+    LABEL="${BASH_REMATCH[2]}"
+fi
+
+# Determine mode + dimensions from the label name
+if [[ -n "${DIECUT_SIZE[$LABEL]:-}" ]]; then
+    MODE="die-cut"
+    DIMS="${DIECUT_SIZE[$LABEL]}"
+    WIDTH="${DIMS%x*}"
+    HEIGHT="${DIMS#*x}"
+elif [[ -n "${LABEL_WIDTH_PX[$LABEL]:-}" ]]; then
+    MODE="endless"
+    WIDTH="${LABEL_WIDTH_PX[$LABEL]}"
+    HEIGHT=""
+else
+    log "Unknown label '$LABEL', defaulting to $DEFAULT_LABEL"
+    LABEL="$DEFAULT_LABEL"
+    MODE="die-cut"
+    DIMS="${DIECUT_SIZE[$LABEL]}"
+    WIDTH="${DIMS%x*}"
+    HEIGHT="${DIMS#*x}"
+fi
+LABEL_ARG="$LABEL"
+log "Label: $LABEL mode=$MODE size=${WIDTH}x${HEIGHT:-auto}"
+
+# Convert to label-sized PNG
+OUTPUT="$TMPDIR/label.png"
+
+CONVERT_CMD=(
+    convert
+    -density 300
+    "${INPUT}[0]"
+    -background white
+    -alpha remove
+    -alpha off
+    -fuzz 5%
+    -trim
+    +repage
+    -resize "${WIDTH}x${HEIGHT}"
+    -colorspace Gray
+    -depth 8
+    -type Grayscale
+)
+
+if [ "$MODE" = "die-cut" ] && [ -n "$HEIGHT" ]; then
+    CONVERT_CMD+=(-gravity center -extent "${WIDTH}x${HEIGHT}")
+fi
+
+CONVERT_CMD+=("$OUTPUT")
+
+log "Running: ${CONVERT_CMD[*]}"
+CONVERT_OUT=$("${CONVERT_CMD[@]}" 2>&1)
+CONVERT_RC=$?
+log "convert exit=$CONVERT_RC output='$CONVERT_OUT'"
+
+if [ $CONVERT_RC -ne 0 ]; then
+    echo "ERROR: ImageMagick conversion failed: $CONVERT_OUT" >&2
+    exit 1
+fi
+
+# Discover USB printer
+PRINTER_URI=$($BROTHER_QL -b pyusb discover 2>/dev/null | grep -oE 'usb://0x[0-9a-fA-F]+:0x[0-9a-fA-F]+(/.*)?' | head -1)
+if [ -z "$PRINTER_URI" ]; then
+    # Fallback: try linux_kernel backend
+    if [ -e /dev/usb/lp0 ]; then
+        BROTHER_BACKEND="linux_kernel"
+        PRINTER_URI="file:///dev/usb/lp0"
+    else
+        echo "ERROR: No Brother QL printer found via USB" >&2
+        log "No USB printer discovered"
+        exit 1
+    fi
+else
+    BROTHER_BACKEND="pyusb"
+fi
+log "Printer URI: $PRINTER_URI (backend: $BROTHER_BACKEND)"
+
+# Apply any printer settings the job carries (QLAutoPowerOff=Never, ... from
+# the print dialog). A job without them does not touch the printer here, and a
+# setting that fails does not stop the label.
+if [[ "$OPTIONS" == *QL*=* ]]; then
+    SETTINGS_OUT=$(PYTHONPATH="$SETTINGS_PATH" python3 -m brother_label_settings apply-job-options "$OPTIONS" 2>&1)
+    log "ql_settings exit=$? output='$SETTINGS_OUT'"
+fi
+
+# Print via brother_ql (handles copies)
+for ((i = 1; i <= COPIES; i++)); do
+    log "Printing copy $i/$COPIES: label=$LABEL_ARG"
+    PRINT_OUT=$($BROTHER_QL -b "$BROTHER_BACKEND" -p "$PRINTER_URI" -m "$BROTHER_MODEL" print -l "$LABEL_ARG" "$OUTPUT" 2>&1)
+    PRINT_RC=$?
+    log "brother_ql exit=$PRINT_RC output='$PRINT_OUT'"
+    if [ $PRINT_RC -ne 0 ]; then
+        echo "ERROR: brother_ql print failed: $PRINT_OUT" >&2
+        exit 1
+    fi
+done
+
+log "Job $JOB_ID complete"
+exit 0
