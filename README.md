@@ -1,14 +1,25 @@
 # brother-label-settings
 
-Two things for Brother QL and PT label printers on Linux:
+**Put a USB Brother label printer on your Wi-Fi with a small Raspberry Pi.**
+Plug the printer into the Pi, run one installer, and it shows up as an AirPrint
+and network printer for every phone and computer in the house. A web page on
+the Pi shows its status and lets you change the settings stored inside the
+printer, including the one that makes it turn itself off.
 
-- **A settings tool.** Read and change the settings stored inside the printer,
-  over USB. The one most people come for is **auto power off**: the printer
-  turns itself off after a while, and the only official way to stop that is
-  Brother's Printer Setting Tool on Windows or macOS.
-- **A Raspberry Pi print server.** Plug a USB-only QL printer into a Pi and it
-  becomes an AirPrint and network printer, with a web page for status, jobs and
-  the settings above. [Jump to it.](#raspberry-pi-print-server)
+![Your devices print over Wi-Fi to a Raspberry Pi, which is connected by USB to the label printer](docs/images/overview.svg)
+
+| Status and connection details | The printer's stored settings |
+|---|---|
+| ![The web page showing the printer ready, the loaded label size, and its network addresses](docs/images/web-status.png) | ![The web page's settings card, with auto power off set to Never](docs/images/web-settings.png) |
+
+The repository has two parts, and you can use either alone:
+
+- **[The Raspberry Pi print server](#raspberry-pi-print-server).** The Wi-Fi
+  printer above. Built for and tested on a QL-1100.
+- **A settings tool** for Linux. Read and change the settings stored inside 14
+  QL and PT models over USB. The one most people come for is **auto power
+  off**: the printer turns itself off after a while, and the only official way
+  to stop that is Brother's Printer Setting Tool on Windows or macOS.
 
 ```console
 $ brother-label-settings show
@@ -176,6 +187,22 @@ those commands and values, with this project's own names.
 QL-1100 sends back.
 
 None of Brother's files, text or code is included here.
+
+## Related projects
+
+This is not a printer driver, and it is not the only way to use these printers
+on Linux.
+
+- [brother_ql](https://github.com/matmair/brother_ql-inventree) prints to QL
+  printers from Python and the command line. The print server here uses it.
+- [cups-rastertoql](https://flap.codeberg.page/cups-rastertoql) is a CUPS
+  driver for the QL family. It can also set the power-off timeout as a print
+  option on the models it covers.
+- Brother publishes its own Linux printing drivers for many models.
+
+What this project adds: it reads the settings back from the printer, so you can
+see what is stored; it covers the other stored settings as well as power off;
+and its tables include the QL-1100, QL-1110NWB and the PT models.
 
 ## Development
 
