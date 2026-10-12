@@ -19,8 +19,37 @@ cd brother-label-settings/print-server
 sudo ./install.sh
 ```
 
+Start from Raspberry Pi OS with the Pi on your network and the printer plugged
+into its USB port. `install.sh` then:
+
+- installs CUPS, cups-filters, Avahi, ImageMagick and
+  [brother_ql](https://github.com/matmair/brother_ql-inventree);
+- adds a shared queue named `Label_Printer` with the auto-fit filter;
+- replaces CUPS's certificate with one Apple devices accept (below);
+- turns off Wi-Fi power saving, which stalls the Pi Zero 2 W's radio;
+- installs the web page as a service on port 9631.
+
 `install.sh` is written from the configuration of the one Pi this runs on. The
-script itself has not been run on a fresh system, so read it first.
+script itself has not been run on a fresh system, so read it first, and please
+report what you had to change.
+
+## Adding the printer
+
+- **macOS, iOS, iPadOS:** it appears as "Label Printer" wherever you add a
+  printer (AirPrint). Nothing to install.
+- **Linux:** `lpadmin -p Label_Printer -E -v ipp://<hostname>.local:631/printers/Label_Printer -m everywhere`.
+  Not tried.
+- **Windows:** Add a printer > "The printer that I want isn't listed" > select
+  a shared printer by name > `http://<hostname>.local:631/printers/Label_Printer`.
+  Not tried.
+
+### The certificate
+
+CUPS makes itself a certificate valid for ten years. Apple devices refuse a
+server certificate valid for more than 825 days: macOS pauses the queue with
+`cups-pki-invalid`, and printing from iOS fails without a message. The
+installer replaces it with one valid for 398 days. **It expires**: run
+`sudo ./install.sh` again within the year, or printing from Apple devices stops.
 
 For a model other than the QL-1100, run it as `sudo BROTHER_MODEL=QL-800
 ./install.sh` and change the default near the top of `brother-ql-autofit`. The
