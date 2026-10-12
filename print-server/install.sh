@@ -22,7 +22,9 @@ REPO="$(dirname "$HERE")"
 
 echo "== packages"
 apt-get update -q
-apt-get install -y -q cups cups-client avahi-daemon python3 python3-venv imagemagick
+# cups-filters converts what AirPrint clients send (iOS sends image/urf)
+apt-get install -y -q cups cups-client cups-filters avahi-daemon openssl \
+    python3 python3-venv imagemagick
 
 # ImageMagick refuses to read PDFs by default; the filter converts them
 for policy in /etc/ImageMagick-6/policy.xml /etc/ImageMagick-7/policy.xml; do
@@ -42,7 +44,43 @@ cupsctl --share-printers
 # The filter prints through brother_ql itself, so the queue's device is /dev/null
 lpadmin -p "$PRINTER_NAME" -E -v file:///dev/null -P "$HERE/label-printer-autofit.ppd" \
     -D "Label Printer" -o printer-is-shared=true
-systemctl enable --now cups avahi-daemon
+
+echo "== TLS certificate Apple devices accept"
+# CUPS makes itself a certificate valid for 10 years. Apple refuses any server
+# certificate valid for more than 825 days: macOS pauses the queue with
+# "cups-pki-invalid" and AirPrint from iOS fails without a message. Replace it
+# with one certificate valid for 398 days. It has to be renewed before then:
+# run this script again.
+HOST="$(hostname)"
+IP="$(hostname -I | awk '{print $1}')"
+CERT="/etc/cups/ssl/$HOST.local"
+if grep -qE '^#?CreateSelfSignedCerts\s' /etc/cups/cups-files.conf; then
+    sed -i -E 's/^#?CreateSelfSignedCerts\s.*/CreateSelfSignedCerts No/' /etc/cups/cups-files.conf
+else
+    echo 'CreateSelfSignedCerts No' >> /etc/cups/cups-files.conf
+fi
+install -d -m 0700 -g lp /etc/cups/ssl
+# 5184000 s = 60 days: keep a certificate that still has that long to run
+if ! openssl x509 -in "$CERT.crt" -noout -checkend 5184000 >/dev/null 2>&1; then
+    find /etc/cups/ssl -maxdepth 1 \( -name '*.crt' -o -name '*.key' \) -delete
+    openssl req -x509 -newkey rsa:2048 -sha256 -days 398 -nodes \
+        -keyout "$CERT.key" -out "$CERT.crt" -subj "/CN=$HOST.local" \
+        -addext "subjectAltName=DNS:$HOST.local,DNS:$HOST,DNS:localhost${IP:+,IP:$IP}" \
+        -addext "extendedKeyUsage=serverAuth" 2>/dev/null
+    chmod 0644 "$CERT.crt"
+    chmod 0600 "$CERT.key"
+fi
+
+# The Pi Zero 2 W's Wi-Fi stalls with power saving on, and the printer drops
+# off the network until a reboot
+if [[ -d /etc/NetworkManager/conf.d ]]; then
+    printf '[connection]\nwifi.powersave = 2\n' > /etc/NetworkManager/conf.d/wifi-powersave-off.conf
+    systemctl reload NetworkManager 2>/dev/null || true
+fi
+
+systemctl enable cups avahi-daemon
+systemctl restart cups
+systemctl start avahi-daemon
 
 echo "== web UI"
 install -d -o "$SERVICE_USER" -g "$SERVICE_USER" "$WEB_DIR"
