@@ -1,9 +1,14 @@
 # brother-label-settings
 
-Read and change the settings stored inside Brother QL and PT label printers,
-from Linux, over USB. The setting most people come for is **auto power off**:
-the printer turns itself off after a while, and the only official way to stop
-that is Brother's Printer Setting Tool on Windows or macOS.
+Two things for Brother QL and PT label printers on Linux:
+
+- **A settings tool.** Read and change the settings stored inside the printer,
+  over USB. The one most people come for is **auto power off**: the printer
+  turns itself off after a while, and the only official way to stop that is
+  Brother's Printer Setting Tool on Windows or macOS.
+- **A Raspberry Pi print server.** Plug a USB-only QL printer into a Pi and it
+  becomes an AirPrint and network printer, with a web page for status, jobs and
+  the settings above. [Jump to it.](#raspberry-pi-print-server)
 
 ```console
 $ brother-label-settings show
@@ -22,10 +27,6 @@ auto_power_off               Never (0x00)
 ...
 ```
 
-The repository also holds a [Raspberry Pi print server](print-server/) for
-these printers, with a web page for the settings and the same settings in the
-macOS print dialog.
-
 This project is not affiliated with or endorsed by Brother Industries.
 
 ## What has been tested
@@ -42,6 +43,10 @@ against the hardware yet.
 | QL-600, QL-800, QL-810W, QL-820NWB, QL-1110NWB | Not tested |
 | PT-D800W, PT-E800W, PT-P710BT, PT-P715eBT, PT-P900W, PT-P910BT, PT-P950NW | Not tested |
 | TP-M5000N | Not tested |
+| Print server on a Pi Zero 2 W with a QL-1100 | Runs on one Pi: the shared queue, the web page, and reading settings through it |
+| Print server installer (`install.sh`) | Written from that Pi's configuration. Not run on a fresh system. |
+| Settings in the macOS print dialog | macOS 27 accepts the PPD and lists the options. A job carrying an option through to the printer has not been checked. |
+| Print server with any other model | Not tested |
 
 If you have one of the untested models, `show` only reads, so it is the safe
 first step. Please open an issue with the output either way, working or not.
@@ -100,6 +105,43 @@ hour on a QL-800. `brother-label-settings models` prints the exact values.
 
 Not covered: Wi-Fi and Bluetooth settings on any model, and the PJ mobile
 printers, which use other mechanisms.
+
+## Raspberry Pi print server
+
+A QL-1100 has USB and nothing else. A Raspberry Pi next to it puts it on the
+network:
+
+- **AirPrint.** It appears on macOS, iOS and iPadOS with nothing to install.
+- **Network printer.** A shared CUPS queue (IPP) for Linux and Windows.
+- **Auto-fit.** A PDF or image is trimmed to its content and scaled to the
+  label, so a shipping label on a letter-size page prints as a 4 x 6 label.
+- **Web page** on port 9631: printer status, loaded label size, job queue, PDF
+  upload, and the printer's stored settings.
+- **macOS print dialog.** Optionally, the stored settings as print options.
+
+With Raspberry Pi OS on the Pi, the Pi on your network and the printer plugged
+into it:
+
+```bash
+git clone https://github.com/toml0006/brother-label-settings
+cd brother-label-settings/print-server
+sudo ./install.sh
+```
+
+Then add "Label Printer" on your devices, and open
+`http://<hostname>.local:9631` for the web page.
+
+Read these before relying on it:
+
+- The installer mirrors one working Pi and has not been run on a fresh system.
+- The web page has no login. Keep the Pi on a network you trust.
+- Apple devices need a certificate that expires: re-run the installer within
+  the year.
+- The label sizes are the QL-1100's.
+
+[print-server/README.md](print-server/README.md) has the details: what the
+installer changes, adding the printer on each system, the certificate, and the
+macOS print dialog.
 
 ## From Python
 
