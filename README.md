@@ -57,7 +57,7 @@ against the hardware yet.
 | Print server on a Pi Zero 2 W with a QL-1100 | Runs on one Pi: the shared queue, the web page, and reading settings through it |
 | Print server installer (`install.sh`) | Written from that Pi's configuration. Not run on a fresh system. |
 | Log kept on disk, and the optional `slim-down.sh` | Both are in place on that Pi and survive a reboot. `slim-down.sh` itself has only been run there, where the services were already off. |
-| Settings in the macOS print dialog | macOS 27 accepts the PPD and lists the options. Not checked: that Add Printer offers the installed driver, and a job carrying an option through to the printer. |
+| Settings in the macOS print dialog | macOS 27 accepts the PPD and lists the options. Add Printer lists the installed driver under Select Software, but does not select it automatically. Not checked: a job carrying an option through to the printer. |
 | Print server with any other model | Not tested |
 
 If you have one of the untested models, `show` only reads, so it is the safe
@@ -130,7 +130,7 @@ network:
 - **Web page** on port 9631: printer status, loaded label size, job queue, PDF
   upload, and the printer's stored settings.
 - **macOS print dialog.** Optionally, a driver for the Mac that adds the
-  stored settings as print options. Add Printer then offers it next to AirPrint.
+  stored settings as print options. You pick it when adding the printer.
 
 With Raspberry Pi OS on the Pi, the Pi on your network and the printer plugged
 into it:
