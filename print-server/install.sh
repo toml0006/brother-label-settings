@@ -78,6 +78,15 @@ if [[ -d /etc/NetworkManager/conf.d ]]; then
     systemctl reload NetworkManager 2>/dev/null || true
 fi
 
+# Raspberry Pi OS keeps the journal in memory (a drop-in under /usr/lib with
+# Storage=volatile), so a Pi that drops off the network and is power-cycled
+# leaves no trace of why. Keep it on disk, capped to spare the SD card. Read
+# the boot before this one with: journalctl -b -1
+install -d -m 0755 /etc/systemd/journald.conf.d
+printf '[Journal]\nStorage=persistent\nSystemMaxUse=50M\n' > /etc/systemd/journald.conf.d/50-persistent.conf
+systemctl restart systemd-journald
+journalctl --flush
+
 systemctl enable cups avahi-daemon
 systemctl restart cups
 systemctl start avahi-daemon

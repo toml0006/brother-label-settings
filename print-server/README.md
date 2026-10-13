@@ -27,11 +27,32 @@ into its USB port. `install.sh` then:
 - adds a shared queue named `Label_Printer` with the auto-fit filter;
 - replaces CUPS's certificate with one Apple devices accept (below);
 - turns off Wi-Fi power saving, which stalls the Pi Zero 2 W's radio;
+- keeps the system log on disk, 50 MB at most (below);
 - installs the web page as a service on port 9631.
 
 `install.sh` is written from the configuration of the one Pi this runs on. The
 script itself has not been run on a fresh system, so read it first, and please
 report what you had to change.
+
+### If the Pi drops off the network
+
+Raspberry Pi OS keeps its log in memory, so a Pi that is power-cycled to get
+it back leaves no trace of what went wrong. The installer keeps the log on
+disk. After restarting the Pi, read the boot before the current one first:
+
+```bash
+sudo journalctl -b -1
+```
+
+### A Pi that only prints
+
+Optional: `sudo ./slim-down.sh` stops the services a print server does not use
+and keeps them from starting: `ModemManager`, `bluetooth`, `cups-browsed`,
+`colord`, `udisks2`, `e2scrub_reap`, and the `e2scrub_all` and `man-db`
+timers. Nothing is uninstalled, and each one comes back with
+`sudo systemctl unmask <unit>`. Do not run it on a machine that does anything
+else. On the Pi Zero 2 W this was built on, it left 15 services running and
+about 265 MB of 416 MB available after boot.
 
 ## Adding the printer
 
@@ -109,6 +130,7 @@ The same options work from any CUPS client:
 | `../brother_label_settings/` | `/opt/label-printer-web/brother_label_settings/` |
 | `brother-ql-autofit` | `/usr/lib/cups/filter/` |
 | `label-printer-autofit.ppd` | the queue's PPD |
+| `slim-down.sh` | run on the Pi, optional |
 | `label-printer-macos.ppd`, `install-macos-driver.sh`, `add-macos-printer.sh` | used on the Mac |
 
 The filter prints through [brother_ql](https://github.com/matmair/brother_ql-inventree)
