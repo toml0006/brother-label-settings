@@ -4,7 +4,7 @@
 *LanguageVersion: English
 *LanguageEncoding: ISOLatin1
 *PCFileName: "QL1100M.PPD"
-*Product: "(Brother QL-1100)"
+*Product: "(Brother QL-1100 Label Print Server)"
 *Manufacturer: "Brother"
 *ModelName: "Brother QL-1100 Label Print Server"
 *ShortNickName: "Brother QL-1100 Print Server"
@@ -17,8 +17,10 @@
 *LandscapeOrientation: Plus90
 *TTRasterizer: Type42
 
-*% The PPD for a Mac that prints to the Pi (add-macos-printer.sh installs it).
-*% The Mac passes the document through untouched; the Pi's own queue converts
+*% The PPD for a Mac that prints to the Pi (install-macos-driver.sh installs
+*% it). *Product is the name the Pi's queue advertises, which is how macOS
+*% finds this file when the printer is added; it is not Brother's own product
+*% name, so Brother's driver is not matched instead. The Mac passes the document through untouched; the Pi's own queue converts
 *% and prints it. This file exists to put options in the macOS print dialog,
 *% which a driverless (AirPrint) queue cannot show: the Mac sends them with
 *% the job and brother-ql-autofit on the Pi acts on them.

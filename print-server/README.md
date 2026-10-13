@@ -71,20 +71,32 @@ Settings are refused while a job is in the queue.
 ## The macOS print dialog
 
 A printer added through AirPrint cannot show these settings: its dialog is
-built from standard attributes. Run this once on the Mac to switch its queue to
-`label-printer-macos.ppd`:
+built from standard attributes, and a printer cannot send a Mac its driver. As
+with any vendor's printer, the driver has to be installed on the Mac first.
+Here it is one file, `label-printer-macos.ppd`. Install it once:
 
 ```bash
-./add-macos-printer.sh            # queue Label_Printer, keeps its current address
+sudo ./install-macos-driver.sh
 ```
 
-The dialog then has **Printer Options > Stored Printer Settings**, one menu per
+Then add the printer in System Settings > Printers & Scanners > Add Printer.
+Select "Label Printer", and the **Use** menu offers two choices:
+
+- **AirPrint**: nothing extra, no settings in the dialog.
+- **Brother QL-1100 Label Print Server (macOS)**: the settings below.
+
+macOS offers the second one because the Pi's queue advertises the product name
+that file declares. To convert a queue you already have instead of adding it
+again, run `./add-macos-printer.sh` (queue `Label_Printer`, keeps its address).
+
+With that driver the dialog has **Printer Options > Stored Printer Settings**, one menu per
 setting, each on **Don't change**. Pick a value and print a label: the Pi
 applies the setting, then prints. The printer remembers it. The dialog cannot
 show the printer's current values; the web page does.
 
-Checked: macOS 27 accepts the PPD and lists the options. Not checked: a job
-carrying an option from a Mac through to the printer.
+Checked: macOS 27 accepts the PPD and lists the options. Not checked: that
+Add Printer offers the installed driver for the Pi's queue, and a job carrying
+an option from a Mac through to the printer.
 
 The same options work from any CUPS client:
 `lp -d Label_Printer -o QLAutoPowerOff=Never label.pdf`.
@@ -97,7 +109,7 @@ The same options work from any CUPS client:
 | `../brother_label_settings/` | `/opt/label-printer-web/brother_label_settings/` |
 | `brother-ql-autofit` | `/usr/lib/cups/filter/` |
 | `label-printer-autofit.ppd` | the queue's PPD |
-| `label-printer-macos.ppd`, `add-macos-printer.sh` | used on the Mac |
+| `label-printer-macos.ppd`, `install-macos-driver.sh`, `add-macos-printer.sh` | used on the Mac |
 
 The filter prints through [brother_ql](https://github.com/matmair/brother_ql-inventree)
 itself, so the CUPS queue's device is `/dev/null`. Its log is

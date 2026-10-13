@@ -26,3 +26,4 @@ jobs:
           bash -n print-server/brother-ql-autofit
           bash -n print-server/install.sh
           bash -n print-server/add-macos-printer.sh
+          bash -n print-server/install-macos-driver.sh

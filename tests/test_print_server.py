@@ -111,6 +111,17 @@ def test_both_ppds_carry_the_packages_option_block(ppd):
     assert bls.ppd_options(QL1100) in text
 
 
+def test_the_macs_ppd_names_the_product_the_pis_queue_advertises():
+    # macOS offers an installed PPD for a printer advertising the same product
+    def product(ppd):
+        lines = (SERVER_DIR / ppd).read_text().splitlines()
+        return [line for line in lines if line.startswith("*Product:")]
+
+    assert product("label-printer-macos.ppd") == product("label-printer-autofit.ppd")
+    # Brother's own macOS driver claims "(QL-1100)"; it must not match the Pi
+    assert product("label-printer-macos.ppd") == ['*Product: "(Brother QL-1100 Label Print Server)"']
+
+
 @pytest.mark.skipif(not shutil.which("cupstestppd"), reason="cupstestppd not installed")
 def test_the_macos_ppd_passes_cupstestppd():
     run = subprocess.run(["cupstestppd", str(SERVER_DIR / "label-printer-macos.ppd")],
