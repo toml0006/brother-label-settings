@@ -56,6 +56,7 @@ against the hardware yet.
 | TP-M5000N | Not tested |
 | Print server on a Pi Zero 2 W with a QL-1100 | Runs on one Pi: the shared queue, the web page, and reading settings through it |
 | Print server installer (`install.sh`) | Written from that Pi's configuration. Not run on a fresh system. |
+| Log kept on disk, and the optional `slim-down.sh` | Both are in place on that Pi and survive a reboot. `slim-down.sh` itself has only been run there, where the services were already off. |
 | Settings in the macOS print dialog | macOS 27 accepts the PPD and lists the options. Not checked: that Add Printer offers the installed driver, and a job carrying an option through to the printer. |
 | Print server with any other model | Not tested |
 
