@@ -1,11 +1,12 @@
 #!/bin/bash
-# Install the label printer's driver on a Mac, once. After that, adding the
-# printer in System Settings offers it under "Use" next to AirPrint, and a
-# queue added with it shows the printer's stored settings in the print dialog.
+# Install the label printer's driver on a Mac, once. After that it is listed
+# under Use > Select Software... when the printer is added in System Settings,
+# and a queue added with it shows the printer's stored settings in the print
+# dialog.
 #
-# The "driver" is one PPD file. macOS offers it for a printer whose advertised
-# product name matches the file's *Product line, the same way it offers a
-# vendor's driver once that vendor's package is installed.
+# The "driver" is one PPD file. macOS does not select it automatically for the
+# Pi's queue (seen on macOS 27): it lists the queue as "Bonjour Shared" and
+# preselects "Generic PostScript Printer".
 #
 #   sudo ./install-macos-driver.sh
 #   Undo: sudo rm "/Library/Printers/PPDs/Contents/Resources/Brother QL-1100 Label Print Server.gz"
@@ -22,4 +23,5 @@ chmod 0644 "$DEST"
 
 echo "Installed: $DEST"
 echo "Now add the printer: System Settings > Printers & Scanners > Add Printer,"
-echo "select Label Printer, and under Use choose \"Brother QL-1100 Label Print Server (macOS)\"."
+echo "select Label Printer, and under Use choose Select Software... and then"
+echo "\"Brother QL-1100 Label Print Server (macOS)\"."

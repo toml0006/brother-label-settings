@@ -101,13 +101,12 @@ sudo ./install-macos-driver.sh
 ```
 
 Then add the printer in System Settings > Printers & Scanners > Add Printer.
-Select "Label Printer", and the **Use** menu offers two choices:
+Select "Label Printer", and under **Use** choose **Select Software...** and
+pick **Brother QL-1100 Label Print Server (macOS)**.
 
-- **AirPrint**: nothing extra, no settings in the dialog.
-- **Brother QL-1100 Label Print Server (macOS)**: the settings below.
-
-macOS offers the second one because the Pi's queue advertises the product name
-that file declares. To convert a queue you already have instead of adding it
+macOS does not pick it by itself. It lists the Pi's queue as "Bonjour Shared"
+and preselects "Generic PostScript Printer", which prints but shows no settings
+(seen on macOS 27). To convert a queue you already have instead of adding it
 again, run `./add-macos-printer.sh` (queue `Label_Printer`, keeps its address).
 
 With that driver the dialog has **Printer Options > Stored Printer Settings**, one menu per
@@ -115,9 +114,9 @@ setting, each on **Don't change**. Pick a value and print a label: the Pi
 applies the setting, then prints. The printer remembers it. The dialog cannot
 show the printer's current values; the web page does.
 
-Checked: macOS 27 accepts the PPD and lists the options. Not checked: that
-Add Printer offers the installed driver for the Pi's queue, and a job carrying
-an option from a Mac through to the printer.
+Checked on macOS 27: it accepts the PPD and lists the options, and the
+installed driver appears under **Select Software...**. Not checked: a job
+carrying an option from a Mac through to the printer.
 
 The same options work from any CUPS client:
 `lp -d Label_Printer -o QLAutoPowerOff=Never label.pdf`.
